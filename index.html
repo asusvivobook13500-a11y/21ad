@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Video Arxiv - Shaxsiy Admin</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <title>Video Arxiv - Remote Auth</title>
     <style>
         :root {
             --bg-color: #000000;
@@ -38,38 +37,30 @@
             font-size: 13px; align-items: center; gap: 6px; white-space: nowrap;
         }
         .admin-btn {
-            background: rgba(109, 40, 217, 0.1); border: 1px solid var(--card-border);
-            color: var(--text-gray); padding: 10px; border-radius: 12px;
-            display: flex; align-items: center; font-size: 12px; font-weight: bold; border: 1px solid #333;
+            background: rgba(109, 40, 217, 0.1); border: 1px solid var(--primary);
+            color: var(--primary); padding: 10px; border-radius: 12px; cursor: pointer;
+            display: flex; align-items: center; transition: 0.3s;
         }
-        .admin-btn.active-admin { border-color: var(--neon-green); color: var(--neon-green); background: rgba(34, 197, 94, 0.1); }
+        .admin-btn.waiting { border-color: var(--yellow); color: var(--yellow); animation: pulse 1.5s infinite; }
+        .admin-btn.logged-in { border-color: var(--red); color: var(--red); background: rgba(239, 68, 68, 0.1); }
+
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
 
         #video-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; width: 100%; }
-
-        .video-card { 
-            background: var(--card-bg); border: 1px solid var(--card-border); 
-            border-radius: 20px; padding: 14px; display: flex; flex-direction: column; gap: 12px; transition: 0.3s;
-        }
+        .video-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 20px; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
         .video-card.watched { border-color: var(--neon-green); opacity: 0.8; }
-        .video-card.watched img { filter: grayscale(1); }
-
-        .video-title { font-size: 13px; font-weight: 600; flex: 1; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-
+        
+        .video-title { font-size: 13px; font-weight: 600; line-height: 1.4; height: 36px; overflow: hidden; }
         .video-preview-box { width: 100%; aspect-ratio: 16/9; background: #18181b; border-radius: 12px; overflow: hidden; border: 1px solid #27272a; }
         .video-preview-box img { width: 100%; height: 100%; object-fit: cover; }
 
-        .video-footer { display: flex; justify-content: space-between; align-items: center; }
-        .time-badge { 
-            font-size: 11px; color: var(--blue); font-weight: 700; background: rgba(59, 130, 246, 0.1); 
-            padding: 5px 10px; border-radius: 8px; display: flex; align-items: center; gap: 5px;
-        }
-
-        .icon-btn { background: none; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 4px; border-radius: 6px; }
-
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: none; justify-content: center; align-items: center; z-index: 1000; backdrop-filter: blur(8px); }
-        .modal { background: #121214; padding: 25px; border-radius: 24px; width: 92%; max-width: 380px; border: 1px solid #333; }
-        .modal input, .modal textarea { width: 100%; padding: 12px; background: #000; border: 1px solid #333; color: white; border-radius: 10px; margin-bottom: 12px; outline: none; font-size: 14px; }
+        .modal { background: #121214; padding: 25px; border-radius: 24px; width: 92%; max-width: 380px; border: 1px solid #333; text-align: center; }
+        .modal input, .modal textarea { width: 100%; padding: 12px; background: #000; border: 1px solid #333; color: white; border-radius: 10px; margin-bottom: 12px; outline: none; }
         .save-btn { background: var(--primary); color: white; border: none; padding: 14px; width: 100%; border-radius: 12px; font-weight: bold; cursor: pointer; }
+
+        .loader { border: 3px solid #333; border-top: 3px solid var(--primary); border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 15px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         @media (max-width: 450px) { #video-grid { grid-template-columns: 1fr; } }
     </style>
@@ -83,55 +74,121 @@
             <div class="mini-counter">Soni: <b id="total-count">0</b></div>
         </div>
         <div class="header-btns">
-            <button id="add-btn-element" class="add-btn" onclick="openM()">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                Qo'shish
+            <button id="add-btn-element" class="add-btn" onclick="openM()">Qo'shish</button>
+            <button id="admin-main-btn" class="admin-btn" onclick="handleAdminAuth()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
             </button>
-            <div id="admin-badge" class="admin-btn">
-                <span id="admin-text">Kutilmoqda...</span>
-            </div>
         </div>
     </header>
     <div id="video-grid"></div>
 </div>
 
+<div class="modal-overlay" id="auth-modal">
+    <div class="modal">
+        <h3>Tasdiqlash kutilmoqda...</h3>
+        <p style="font-size: 13px; color: var(--text-gray); margin-top: 10px;">Telegram botingizga kirish so'rovi yuborildi.</p>
+        <div class="loader"></div>
+        <button onclick="cancelAuth()" style="background:none; border:none; color:var(--red); cursor:pointer;">Bekor qilish</button>
+    </div>
+</div>
+
 <div class="modal-overlay" id="modal">
     <div class="modal">
-        <h3 id="modal-title" style="margin-bottom:20px; text-align:center">Yangi Video</h3>
-        <input type="text" id="v-title" placeholder="Video nomi">
-        <input type="text" id="v-link" placeholder="YouTube URL Link">
-        <input type="text" id="v-time" placeholder="Davomiyligi (00:00:00)" maxlength="8" oninput="formatTime(this)">
-        <textarea id="v-note" placeholder="Eslatma yoki qaydlar..." rows="3"></textarea>
+        <h3 id="modal-title" style="margin-bottom:20px;">Ma'lumotlar</h3>
+        <input type="text" id="v-title" placeholder="Sarlavha">
+        <input type="text" id="v-link" placeholder="YouTube Link">
+        <input type="text" id="v-time" placeholder="Vaqt (00:00:00)" maxlength="8" oninput="formatTime(this)">
+        <textarea id="v-note" placeholder="Qaydlar..." rows="3"></textarea>
         <button class="save-btn" onclick="save()">Saqlash</button>
         <button onclick="closeM()" style="background:none; border:none; color:#555; width:100%; margin-top:12px; cursor:pointer">Bekor qilish</button>
     </div>
 </div>
 
 <script>
-    // --- ADMIN SOZLAMASI ---
-    const MY_CHAT_ID = 5256241453; 
+    const BOT_TOKEN = '8435664756:AAEWyflGuuuNHbR4H2mW-I8XT1WH3L7vcBk';
+    const ADMIN_CHAT_ID = '5256241453';
     const DB_KEY = 'chingiz_archive_final_v2';
     
-    const tg = window.Telegram.WebApp;
     let db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
     let isAdmin = false;
+    let authCheckInterval = null;
+    let lastUpdateId = 0;
     let editIdx = null;
 
-    // Telegram orqali shaxsni tasdiqlash
-    function checkIdentity() {
-        tg.ready();
-        const user = tg.initDataUnsafe?.user;
-        
-        // Agar foydalanuvchi ID si sizniki bo'lsa adminlik beriladi
-        if (user && user.id === MY_CHAT_ID) {
-            isAdmin = true;
-            document.getElementById('admin-text').innerText = "Admin: " + (user.first_name || "Siz");
-            document.getElementById('admin-badge').classList.add('active-admin');
+    function handleAdminAuth() {
+        if (isAdmin) {
+            if(confirm("Admin rejimidan chiqish?")) { isAdmin = false; updateUI(); }
         } else {
-            isAdmin = false;
-            document.getElementById('admin-text').innerText = "Foydalanuvchi";
+            startBotAuth();
         }
-        updateUI();
+    }
+
+    async function startBotAuth() {
+        document.getElementById('auth-modal').style.display = 'flex';
+        document.getElementById('admin-main-btn').classList.add('waiting');
+
+        const text = "🔔 Diqqat! Saytingizga kirish uchun ruxsat so'ralmoqda.\n\nQurilma: " + navigator.platform + "\nVaqt: " + new Date().toLocaleTimeString();
+        const keyboard = {
+            inline_keyboard: [[
+                { text: "✅ Tasdiqlash", callback_data: "auth_ok" },
+                { text: "❌ Rad etish", callback_data: "auth_no" }
+            ]]
+        };
+
+        try {
+            await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chat_id: ADMIN_CHAT_ID, text: text, reply_markup: keyboard })
+            });
+            
+            // Polling boshlash
+            await getLatestUpdateId();
+            authCheckInterval = setInterval(checkBotResponse, 2000);
+        } catch (e) {
+            alert("Botga ulanishda xato!");
+            cancelAuth();
+        }
+    }
+
+    async function getLatestUpdateId() {
+        const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?offset=-1`);
+        const data = await res.json();
+        if (data.result.length > 0) lastUpdateId = data.result[0].update_id;
+    }
+
+    async function checkBotResponse() {
+        const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?offset=${lastUpdateId + 1}`);
+        const data = await res.json();
+
+        data.result.forEach(update => {
+            lastUpdateId = update.update_id;
+            if (update.callback_query) {
+                const action = update.callback_query.data;
+                if (action === "auth_ok") {
+                    isAdmin = true;
+                    stopAuth();
+                    updateUI();
+                } else if (action === "auth_no") {
+                    stopAuth();
+                    alert("Kirish rad etildi!");
+                }
+            }
+        });
+    }
+
+    function stopAuth() {
+        clearInterval(authCheckInterval);
+        document.getElementById('auth-modal').style.display = 'none';
+        document.getElementById('admin-main-btn').classList.remove('waiting');
+    }
+
+    function cancelAuth() { stopAuth(); }
+
+    function updateUI() {
+        document.getElementById('add-btn-element').style.display = isAdmin ? 'flex' : 'none';
+        document.getElementById('admin-main-btn').className = isAdmin ? 'admin-btn logged-in' : 'admin-btn';
+        render();
     }
 
     function getYTId(url) {
@@ -149,11 +206,6 @@
         el.value = r;
     }
 
-    function updateUI() {
-        document.getElementById('add-btn-element').style.display = isAdmin ? 'flex' : 'none';
-        render();
-    }
-
     function render() {
         const grid = document.getElementById('video-grid');
         grid.innerHTML = '';
@@ -161,33 +213,24 @@
 
         list.forEach(v => {
             const ytId = getYTId(v.url);
-            const thumb = ytId ? `https://img.youtube.com/vi/${ytId}/mqdefault.jpg` : 'https://via.placeholder.com/320x180/111/333?text=Link+Xato';
-            const eyeColor = v.isWatched ? 'var(--neon-green)' : '#555';
+            const thumb = ytId ? `https://img.youtube.com/vi/${ytId}/mqdefault.jpg` : 'https://via.placeholder.com/320x180/111/333';
             
             grid.innerHTML += `
                 <div class="video-card ${v.isWatched ? 'watched' : ''}">
-                    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+                    <div style="display:flex; justify-content:space-between; align-items:start;">
                         <span class="video-title">${v.name}</span>
                         ${isAdmin ? `
-                        <div style="display:flex; gap:4px">
-                            <button class="icon-btn" onclick="edit(${v.realIdx})"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--yellow)" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>
-                            <button class="icon-btn" onclick="del(${v.realIdx})"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
-                        </div>` : `
-                        <button class="icon-btn" onclick="toggleW(${v.realIdx})">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="${eyeColor}" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>${v.isWatched ? '' : '<line x1="1" y1="1" x2="23" y2="23" stroke="red"></line>'}</svg>
-                        </button>`}
+                        <div style="display:flex; gap:5px">
+                            <button onclick="edit(${v.realIdx})" style="border:none; background:none; color:var(--yellow); cursor:pointer">✎</button>
+                            <button onclick="del(${v.realIdx})" style="border:none; background:none; color:var(--red); cursor:pointer">✕</button>
+                        </div>` : `<button onclick="toggleW(${v.realIdx})" style="border:none; background:none; cursor:pointer">${v.isWatched ? '✅' : '👁️'}</button>`}
                     </div>
-                    <a href="${v.url}" target="_blank" style="text-decoration:none; ${v.isWatched ? 'pointer-events:none' : ''}">
-                        <div class="video-preview-box"><img src="${thumb}"></div>
+                    <a href="${v.url}" target="_blank" class="video-preview-box">
+                        <img src="${thumb}">
                     </a>
-                    <div class="video-footer">
-                        <div class="time-badge">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                            ${v.time || '00:00:00'}
-                        </div>
-                        <button class="icon-btn" onclick="alert('Eslatma: ${v.note ? v.note.replace(/'/g, "\\'") : 'Mavjud emas'}')">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-gray)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-                        </button>
+                    <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--blue)">
+                        <span>${v.time || '00:00:00'}</span>
+                        <span onclick="alert('Qayd: ${v.note || 'Yoq'}')" style="cursor:pointer; color:var(--text-gray)">📝</span>
                     </div>
                 </div>`;
         });
@@ -195,47 +238,18 @@
     }
 
     function toggleW(i) { db[i].isWatched = !db[i].isWatched; localStorage.setItem(DB_KEY, JSON.stringify(db)); render(); }
-    
     function save() {
-        const title = document.getElementById('v-title').value;
-        const url = document.getElementById('v-link').value;
-        if(!title || !url) return alert("Sarlavha va Linkni to'ldiring!");
-
-        const data = { 
-            name: title, 
-            url: url, 
-            time: document.getElementById('v-time').value, 
-            note: document.getElementById('v-note').value, 
-            isWatched: editIdx !== null ? db[editIdx].isWatched : false 
-        };
-
-        if(editIdx === null) db.push(data); else db[editIdx] = data;
-        localStorage.setItem(DB_KEY, JSON.stringify(db)); 
-        closeM(); 
-        render();
+        const d = { name: document.getElementById('v-title').value, url: document.getElementById('v-link').value, time: document.getElementById('v-time').value, note: document.getElementById('v-note').value, isWatched: editIdx!==null ? db[editIdx].isWatched : false };
+        if(!d.name || !d.url) return alert("To'ldiring!");
+        if(editIdx===null) db.push(d); else db[editIdx]=d;
+        localStorage.setItem(DB_KEY, JSON.stringify(db)); closeM(); render();
     }
+    function edit(i) { editIdx=i; document.getElementById('v-title').value=db[i].name; document.getElementById('v-link').value=db[i].url; document.getElementById('v-time').value=db[i].time; document.getElementById('v-note').value=db[i].note; openM(); }
+    function del(i) { if(confirm("O'chirish?")) { db.splice(i,1); localStorage.setItem(DB_KEY, JSON.stringify(db)); render(); } }
+    function openM() { document.getElementById('modal').style.display='flex'; }
+    function closeM() { document.getElementById('modal').style.display='none'; editIdx=null; document.querySelectorAll('.modal input, .modal textarea').forEach(i => i.value = ''); }
 
-    function edit(i) { 
-        editIdx = i; 
-        document.getElementById('v-title').value = db[i].name; 
-        document.getElementById('v-link').value = db[i].url; 
-        document.getElementById('v-time').value = db[i].time; 
-        document.getElementById('v-note').value = db[i].note; 
-        document.getElementById('modal-title').innerText = "Tahrirlash";
-        openM(); 
-    }
-
-    function del(i) { if(confirm("Ushbu videoni o'chirmoqchimisiz?")) { db.splice(i,1); localStorage.setItem(DB_KEY, JSON.stringify(db)); render(); } }
-    function openM() { document.getElementById('modal').style.display = 'flex'; }
-    function closeM() { 
-        document.getElementById('modal').style.display = 'none'; 
-        editIdx = null; 
-        document.getElementById('modal-title').innerText = "Yangi Video";
-        document.querySelectorAll('.modal input, .modal textarea').forEach(i => i.value = ''); 
-    }
-
-    // Ishga tushirish
-    checkIdentity();
+    render();
 </script>
 </body>
 </html>
